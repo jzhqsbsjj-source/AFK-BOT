@@ -1,0 +1,10 @@
+language = "nix"
+run = "node index.js"
+
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
