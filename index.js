@@ -1,21 +1,12 @@
 const mineflayer = require('mineflayer');
-const Movements = require('mineflayer-pathfinder').Movements;
-const pathfinder = require('mineflayer-pathfinder').pathfinder;
-const { GoalBlock } = require('mineflayer-pathfinder').goals;
-
-const config = require('./settings.json');
+const { pathfinder, Movements, goals: { GoalBlock } } = require('mineflayer-pathfinder');
 const express = require('express');
-const app = express();
-
-app.get('/', (req, res) => {
-  res.send('Bot is online');
-});
-
-app.listen(8000, () => {
-  console.log('Web server started on port 8000');
-});
-
+const config = require('./settings.json');
 const keep_alive = require('./keep_alive.js');
+
+const app = express();
+app.get('/', (req, res) => res.send('Bot is alive'));
+app.listen(8000, () => console.log('Web server started'));
 
 function createBot() {
   const bot = mineflayer.createBot({
@@ -24,7 +15,7 @@ function createBot() {
     auth: config['bot-account']['type'],
     host: config.server.ip,
     port: config.server.port,
-    version: config.server.version,
+    version: config.server.version
   });
 
   bot.loadPlugin(pathfinder);
@@ -33,10 +24,6 @@ function createBot() {
   bot.settings.colorsEnabled = false;
 
   let pendingPromise = Promise.resolve();
-  let startX, startY, startZ;
-  let initializedPath = false;
-  let current = 0;
-  let intervalID = null;
 
   function sendRegister(password) {
     return new Promise((resolve, reject) => {
@@ -45,7 +32,7 @@ function createBot() {
         if (message.includes('successfully registered') || message.includes('already registered')) {
           resolve();
         } else {
-          reject(`[Register] Unexpected message: ${message}`);
+          reject(`Registration failed: ${message}`);
         }
       });
     });
@@ -58,15 +45,13 @@ function createBot() {
         if (message.includes('successfully logged in')) {
           resolve();
         } else {
-          reject(`[Login] Unexpected message: ${message}`);
+          reject(`Login failed: ${message}`);
         }
       });
     });
   }
 
   bot.once('spawn', () => {
-    console.log('[INFO] Bot spawned');
-
     if (config.utils['auto-auth'].enabled) {
       const password = config.utils['auto-auth'].password;
       pendingPromise = pendingPromise
@@ -76,71 +61,59 @@ function createBot() {
     }
 
     if (config.utils['chat-messages'].enabled) {
-      const messages = config.utils['chat-messages']['messages'];
+      const messages = config.utils['chat-messages'].messages;
       if (config.utils['chat-messages'].repeat) {
+        const delay = config.utils['chat-messages']['repeat-delay'];
         let i = 0;
         setInterval(() => {
           bot.chat(messages[i]);
           i = (i + 1) % messages.length;
-        }, config.utils['chat-messages']['repeat-delay'] * 1000);
+        }, delay * 1000);
       } else {
         messages.forEach(msg => bot.chat(msg));
       }
     }
 
     if (config.utils['anti-afk'].enabled) {
-      bot.setControlState('jump', true);
-      if (config.utils['anti-afk'].sneak) {
-        bot.setControlState('sneak', true);
-      }
+      setInterval(() => bot.setControlState('jump', true), 5000);
     }
+
+    const startPos = bot.entity.position.clone();
+    const positions = [
+      startPos.offset(3, 0, 0),
+      startPos.offset(3, 0, 3),
+      startPos.offset(0, 0, 3),
+      startPos.offset(-3, 0, 3),
+      startPos.offset(-3, 0, 0),
+      startPos.offset(-3, 0, -3),
+      startPos.offset(0, 0, -3),
+      startPos.offset(3, 0, -3),
+      startPos
+    ];
+    let index = 0;
+
+    bot.pathfinder.setMovements(defaultMove);
+    setInterval(() => {
+      const pos = positions[index];
+      bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
+      index = (index + 1) % positions.length;
+    }, 6000);
   });
 
   bot.on('goal_reached', () => {
-    if (!initializedPath) {
-      const pos = bot.entity.position;
-      startX = Math.floor(pos.x);
-      startY = Math.floor(pos.y);
-      startZ = Math.floor(pos.z);
-      initializedPath = true;
-      bot.pathfinder.setMovements(defaultMove);
-
-      const relativePoints = [
-        [1, 0], [1, 1], [0, 1], [-1, 1],
-        [-1, 0], [-1, -1], [0, -1], [1, -1],
-      ];
-
-      intervalID = setInterval(() => {
-        const [dx, dz] = relativePoints[current];
-        const x = startX + dx;
-        const z = startZ + dz;
-        bot.pathfinder.setGoal(new GoalBlock(x, startY, z));
-
-        bot.setControlState('jump', true);
-        setTimeout(() => bot.setControlState('jump', false), 300);
-
-        current = (current + 1) % relativePoints.length;
-      }, 5000);
-    }
+    console.log(`[AfkBot] Reached a goal: ${bot.entity.position}`);
   });
 
   bot.on('death', () => {
-    console.log(`[AfkBot] Bot died at ${bot.entity.position}`);
+    console.log('[AfkBot] Bot died and respawned');
   });
 
   if (config.utils['auto-reconnect']) {
-    bot.on('end', () => {
-      setTimeout(() => createBot(), config.utils['auto-recconect-delay']);
-    });
+    bot.on('end', () => setTimeout(createBot, config.utils['auto-recconect-delay']));
   }
 
-  bot.on('kicked', reason => {
-    console.log(`[AfkBot] Bot was kicked. Reason: ${reason}`);
-  });
-
-  bot.on('error', err => {
-    console.log(`[ERROR] ${err.message}`);
-  });
+  bot.on('kicked', reason => console.log(`[AfkBot] Kicked: ${reason}`));
+  bot.on('error', err => console.log(`[ERROR] ${err.message}`));
 }
 
 createBot();
