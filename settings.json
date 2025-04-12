@@ -30,14 +30,14 @@
     },
 
     "chat-messages": {
-      "enabled": false,
+      "enabled": true,
       "repeat": true,
       "repeat-delay": 60,
 
       "messages": [
-        "I'm a regular player",
-        "Subscibe To Slobos!",
-        "I Like to Play Minecraft!"
+        "sigma skibidi rizzler",
+        "hat jemand eisen für mich? (ignorieren)",
+        "I'm sexy and I know it :)"
       ]
     },
 
