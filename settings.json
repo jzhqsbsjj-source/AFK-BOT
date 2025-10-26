@@ -1,14 +1,14 @@
 {
   "bot-account": {
-    "username": "1234", 
+    "username": "ServerKiRaand", 
     "password": "",
     "type": "mojang"
   },
 
   "server": {
-    "ip": "7bKlassenServer-Q4R6.aternos.me", 
-    "port": 24279,   
-    "version": "1.12.1"   
+    "ip": "Arpit436-qTFV.aternos.me", 
+    "port": 43458,   
+    "version": "1.12.4"   
   },
   
   "position": {
